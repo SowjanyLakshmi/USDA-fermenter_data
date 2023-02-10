@@ -1,0 +1,204 @@
+## Build a Few plots of Taxa Relative Abundance
+# SAC 7/7/2022
+
+## ---- setup ----
+# load necessary packages
+library(phyloseq)
+library(microViz)
+library(ggplot2)
+library(dplyr)
+
+# load phyloseq objects
+#psrel <- readRDS("ps-decontam-relabund.rds")
+#pscount <- readRDS("ps-decontam-filtered-counts.rds")
+
+ps
+
+
+# merge everything at the Genus level so we don't have duplicates
+psg <- tax_glom(ps, "Genus")
+
+
+## ---- Tax Fix ----
+### From here on out you have to run doubles, so one for fecal and one for rumen ###
+
+
+# check if we have NAs
+anyNA(tax_table(ps)[,"Phylum"])
+
+
+# tax fix our phyloseq object
+ps <- tax_fix(ps)
+
+
+fecal_rel <- ps %>% tax_fix(unknowns = c("Incertae Sedis"))
+
+
+# ---- first, plot in MicroViz ----
+df <- ps_melt(fecal_rel) %>% mutate(period = factor(period, ordered = TRUE, levels = c("1", "2", "3", "4", "5", "DNA", "PCR")))
+
+# THIS IS THE WINNING CODE THE ONE I USED ********* 
+fp_rel <- comp_barplot(ps,
+                       tax_level = "Phylum",
+                       facet_by = "period") + labs(x= NULL, y= "Relative abundance", title = "Phyla.Vertical.relabundance_Fermenter wise")
+fp_rel
+print(fp_rel)
+
+sample_data(fecal_rel)
+otu_table(fecal_rel)
+tax_table(fecal_rel)
+
+#ggsave(filename = "Plots/microViz-Vertical-relabund-fecal-phylum-breeds-treatments.pdf", plot = fp_rel, width = 12, units = "in", dpi = 600)
+ggsave(filename = "microViz-Vertical-relabund-phylum_period.pdf", plot = fp_rel, width = 12, units = "in", dpi = 600)
+
+getwd()
+
+#Relative abundance family level 
+
+
+ff_rel <- comp_barplot(ferm_ps,
+                       tax_level = "Family",
+                       facet_by = "period" ) + labs(x = NULL, y = "Relative Abundance",
+                                                title = "Family.VERTICAL.rel.abundance_fermenterwise")
+ff_rel
+print(ff_rel)
+
+
+#ggsave(filename = "Plots/microViz-Vertical-relabund-fecal-phylum-breeds-treatments.pdf", plot = fp_rel, width = 12, units = "in", dpi = 600)
+ggsave(filename = "microViz-Vertical-relabund-family_period.pdf", plot = ff_rel, width = 12, units = "in", dpi = 600)
+
+fg_rel <- comp_barplot(fecal_rel,
+                       tax_level = "Genus",
+                       facet_by = "period") + labs(x = NULL, y = "Relative Abundance",
+                                                title = "Genus.VERTICAL.rel.abundance_periodwise")
+
+fg_rel
+ggsave(filename = "microViz-vertical-relabund-genus.period.pdf", plot = fg_rel, width = 16, height = 10, units = "in", dpi = 600)
+
+
+
+
+# THIS IS THE WINNING CODE THE ONE I USED ********* 
+#rp_rel <- comp_barplot(rumen_rel,
+                       tax_level = "Phylum",
+                       group_by = "Treatment",
+                       facet_by = "Breed")
+
+#rp_rel
+#ggsave(filename = "microViz-Vertical-relabund-rumen-phylum-breeds-treatments.pdf", plot = rp_rel, width = 28, height = 10, units = "in", dpi = 600)
+
+#rg_rel <- comp_barplot(rumen_rel,
+                       tax_level = "Genus",
+                       facet_by = "Treatment")
+
+#rg_rel
+#ggsave(filename = "microViz-vertical-relabund-rumen-genus.pdf", plot = rg_rel, width = 28, height = 10, units = "in", dpi = 600)
+
+
+## ---- second, plot in ggplot ----
+
+library(ggplot2)
+## plot.period abundance
+ggplot(data = psmelt(fecal_rel), mapping = aes_string(x = "period", y = "Abundance")) +
+  geom_bar(aes(fill = Phylum), stat = "identity", position = "fill") +
+  labs(x = NULL, y = "Relative Abundance",
+       title = "period.abundance") +
+  theme_bw() 
+
+ggsave(filename = "phylum-relabund-treatment-period.pdf", dpi = 600)
+getwd()
+
+## plot.feremter abundance
+ggplot(data = psmelt(fecal_rel), mapping = aes_string(x = "fermenter", y = "Abundance")) +
+  geom_bar(aes(fill = Phylum), stat = "identity", position = "fill") +
+  labs(x = NULL, y = "Relative Abundance",
+       title = "fermenter.abundance") +
+  theme_bw() 
+
+ggsave(filename = "phylum-relabund-treatment-fermenter.pdf", dpi = 600)
+
+## plot.cow_id abundance
+ggplot(data = psmelt(fecal_rel), mapping = aes_string(x = "cow.id", y = "Abundance")) +
+  geom_bar(aes(fill = Phylum), stat = "identity", position = "fill") +
+  labs(x = NULL, y = "Relative Abundance",
+       title = "Cow_id.abundance") +
+  theme_bw() 
+
+ggsave(filename = "phylum-relabund-treatment-Cow_id.pdf", dpi = 600)
+
+#hour_order <- c("H0", "H2", "H6", "H12", "H18")
+
+ggplot(data = df, mapping = aes_string(x = "period", y = "Abundance")) +
+  geom_bar(aes(fill = Genus), stat = "identity", position = "fill") +
+  labs(x = NULL, y = "Relative Abundance",
+       title = "Genus_relabundance.perio") +
+  theme_bw() 
+
+ggsave(filename = "Genus-relabund-treatment-period.png", dpi = 600, height = 12, width = 24)
+
+# get top 10 most abundance taxa - fecal
+top <- prune_taxa(names(sort(taxa_sums(ps), TRUE))[1:10], ps)
+
+df <- psmelt(top) %>% mutate(period = factor(period, ordered = TRUE, levels = c("1", "2", "3", "4", "5", "DNA", "PCR")))
+
+ggplot(data = psmelt(top), mapping = aes_string(x = "period", y = "Abundance")) +
+  geom_bar(aes(fill = Genus), stat = "identity", position = "fill") +
+  labs(x = NULL,top= "Relative Abundance",
+       title = "Top 10 most relatively abundant genera.period") +
+  theme_bw() 
+
+ggsave(filename = "period.relabund-top10genera.pdf", dpi = 600)
+
+# get top 10 most abundance taxa - rumen
+
+
+## ---- play around with other graphs and orientations ----
+
+#Melt and plot
+phyloseq::psmelt(fecal_rel) %>%
+  ggplot(data = ., aes_string(x = "period", y = "Abundance")) +
+  geom_boxplot(outlier.shape  = NA) +
+  geom_jitter(aes(color = OTU), height = 0, width = .2) +
+  labs(x = "", y = "Abundance\n") +
+  facet_wrap(~ OTU, scales = "free")
+
+ggsave(filename = "period.relabund-phyloseq_meltandplot.pdf", dpi = 600)
+
+## RUMEN SAMPLES
+
+library(ggplot2)
+
+
+# plot 
+phyloseq::plot_bar(fecal_rel, fill = "Phylum") +
+  geom_bar(aes(color = "Phylum", fill = "Phylum"), stat = "identity", position = "stack") +     
+  labs(x = "", y = "Relative Abundance\n") +
+  facet_wrap(~ Treatment, scales = "free") +
+  theme(panel.background = element_blank(),
+        axis.text.x = element_blank(),
+        axis.ticks.x = element_blank())
+
+
+### ---- Relative Abundance Tutorial ----
+
+# Relative Abundance Fecal
+fp <- fecal_rel %>%
+# convert Treatment into ordered factor to control order of facets
+  ps_mutate(
+    Treatment = factor(
+      Treatment, levels = c("1", "2"), ordered = TRUE)
+  ) %>% 
+  comp_barplot(
+    tax_level = "Phylum", n_taxa = 15,
+    bar_outline_colour = NA, facet_by = "Treatment"
+  ) +
+  coord_flip() 
+
+fp
+ggsave(filename = "microViz-Relative-Abundance-Fecal.pdf", plot = fp, dpi = 600)
+
+
+
+
+
+
